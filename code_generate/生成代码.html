@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>代码生成器</title>
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <!-- 引入模板配置文件 -->
+    <script src="templates.js"></script>
+</head>
+<body>
+<div id="app">
+    <el-container style="height: 100vh;">
+        <el-main>
+
+            <el-row :gutter="20">
+                <!-- 输入区域 -->
+
+                <el-col :span="12">
+                    <el-row :gutter="20">
+                        <el-col style="width:100px;line-height: 40px;">
+                            <div>
+                                作者配置
+                            </div>
+                        </el-col>
+                        <el-col :span="20">
+                            <el-input
+                                    v-model="author"
+                                    placeholder=""
+                                    @input="generateCode"
+                                    style="margin-bottom:10px">
+                            </el-input>
+                        </el-col>
+
+                    </el-row>
+
+                    <el-card>
+                        <div slot="header">
+                            <span>包名配置</span>
+                        </div>
+                        <el-input
+                                v-model="basePackage"
+                                placeholder="基础包名（如：com.example）"
+                                @input="generateCode"
+                                style="margin-bottom:10px">
+                        </el-input>
+                        <el-row :gutter="10">
+                            <el-col :span="12">
+                                <el-input
+                                        v-model="entityPackage"
+                                        placeholder="实体类包名（默认：entity）"
+                                        @input="generateCode">
+                                </el-input>
+                            </el-col>
+                            <el-col :span="12">
+                                <el-input
+                                        v-model="mapperPackage"
+                                        placeholder="Mapper包名（默认：mapper）"
+                                        @input="generateCode">
+                                </el-input>
+                            </el-col>
+                        </el-row>
+                        <el-row :gutter="10" style="margin-top:10px">
+                            <el-col :span="12">
+                                <el-input
+                                        v-model="servicePackage"
+                                        placeholder="Service包名（默认：service）"
+                                        @input="generateCode">
+                                </el-input>
+                            </el-col>
+                            <el-col :span="12">
+                                <el-input
+                                        v-model="controllerPackage"
+                                        placeholder="Controller包名（默认：controller）"
+                                        @input="generateCode">
+                                </el-input>
+                            </el-col>
+                        </el-row>
+                    </el-card>
+                    <el-card>
+                        <div slot="header">
+                            <span>输入模式</span>
+                            <el-radio-group v-model="inputMode" @change="handleInputModeChange" style="float: right">
+                                <el-radio-button label="fields">字段配置</el-radio-button>
+                                <el-radio-button label="sql">SQL语句</el-radio-button>
+                            </el-radio-group>
+                        </div>
+                        <!-- 添加数据库类型选择 -->
+                        <el-select
+                                @change="generateCode"
+                                v-model="inputDbType"
+                                placeholder="选择SQL类型"
+                                v-if="inputMode === 'sql'"
+                                style="margin-bottom: 10px; width: 100%">
+                            <el-option label="MySQL" value="mysql"></el-option>
+                            <el-option label="Oracle" value="oracle"></el-option>
+                            <el-option label="SQL Server" value="sqlserver"></el-option>
+                            <el-option label="达梦" value="dameng"></el-option>
+                        </el-select>
+                        <el-input
+                                type="textarea"
+                                :rows="15"
+                                :placeholder="sqlInputPlaceholder"
+                                v-model="inputText"
+                                @input="generateCode">
+                        </el-input>
+                    </el-card>
+                </el-col>
+
+                <!-- 输出区域 -->
+                <el-col :span="12">
+                    <el-button @click="exportAllCode" type="primary" size="mini" style="float:right;margin-right:10px;    position: absolute;
+    top: 0px;
+    right: 10px;
+    z-index: 99;">导出ZIP
+                    </el-button>
+                    <el-tabs type="border-card">
+                        <el-tab-pane label="SQL">
+                            <el-row :gutter="20">
+                                <el-button @click="copyCode(sqlCode)" size="mini"
+                                           style="float: right;margin-right:10px">复制
+                                </el-button>
+                                <el-select v-model="dbType" placeholder="选择数据库" style="float: left; width: 160px"
+                                           @change="generateCode">
+                                    <el-option label="MySQL" value="mysql"></el-option>
+                                    <el-option label="Oracle" value="oracle"></el-option>
+                                    <el-option label="SQL Server" value="sqlserver"></el-option>
+                                    <el-option label="达梦" value="dameng"></el-option>
+                                </el-select>
+                            </el-row>
+
+                            <pre><code>{{ sqlCode }}</code></pre>
+
+                        </el-tab-pane>
+                        <el-tab-pane label="实体类">
+                            <el-row :gutter="20">
+                                <el-button @click="copyCode(entityCode)" size="mini"
+                                           style="float: right;;margin-right:10px">复制
+                                </el-button>
+                                <el-select v-model="selectedTemplate" style="float: left; width: 160px">
+                                    <el-option
+                                            v-for="(name, key) in templateNames"
+                                            :key="key"
+                                            :label="name"
+                                            :value="key"
+                                    ></el-option>
+                                </el-select>
+                            </el-row>
+                            <pre><code>{{ entityCode }}</code></pre>
+
+                        </el-tab-pane>
+                        <el-tab-pane label="Mapper">
+                            <el-row :gutter="20">
+                                <el-button @click="copyCode(mapperCode)" size="mini"
+                                           style="float: right;margin-right:10px">复制
+                                </el-button>
+                            </el-row>
+                            <pre><code>{{ mapperCode }}</code></pre>
+                            <el-row :gutter="20">
+                                <el-button @click="copyCode(mapperCodeXml)" size="mini"
+                                           style="float: right;margin-right:10px">复制
+                                </el-button>
+                            </el-row>
+                            <pre><code>{{ mapperCodeXml }}</code></pre>
+                        </el-tab-pane>
+                        <el-tab-pane label="Service">
+
+                            <el-row :gutter="20">
+                                <el-button @click="copyCode(serviceCodeInterface)" size="mini"
+                                           style="float: right;margin-right:10px">复制
+                                </el-button>
+                            </el-row>
+                            <pre><code>{{ serviceCodeInterface }}</code></pre>
+                            <el-row :gutter="20">
+                                <el-button @click="copyCode(serviceCodeImpl)" size="mini"
+                                           style="float: right;margin-right:10px">复制
+                                </el-button>
+                            </el-row>
+                            <pre><code>{{ serviceCodeImpl }}</code></pre>
+                        </el-tab-pane>
+                        <el-tab-pane label="Controller">
+
+                            <el-row :gutter="20">
+                                <el-button @click="copyCode(controllerCode)" size="mini"
+                                           style="float: right;margin-right:10px">复制
+                                </el-button>
+                            </el-row>
+                            <pre><code>{{ controllerCode }}</code></pre>
+                    </el-tabs>
+                </el-col>
+            </el-row>
+
+            </el-row>
+        </el-main>
+
+
+    </el-container>
+</div>
+
+<!-- 引入Vue和ElementUI -->
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+
+    // 数据库配置中心
+    const DB_CONFIG = {
+        mysql: {
+            quote: '`',
+            comment: {
+                table: /COMMENT\s*=\s*'((?:\\'|[^'])*)'/i,
+                column: /COMMENT\s+'((?:\\'|[^'])*)'/i
+            },
+            identity: /AUTO_INCREMENT\b/i,
+            fieldPattern: /^\s*(\S+)\s+([a-z]+(?:\(\d+(?:,\d+)?\))?)(.*)$/i
+        },
+        oracle: {
+            quote: '"',
+            comment: {
+                table: /COMMENT\s+ON\s+TABLE\s+.+?\s+IS\s+'((?:\\'|[^'])*)'/i,
+                column: /COMMENT\s+ON\s+COLUMN\s+.+?\s+IS\s+'((?:\\'|[^'])*)'/i
+            },
+            identity: /GENERATED\s+BY\s+DEFAULT\s+AS\s+IDENTITY/i,
+            fieldPattern: /^\s*(\S+)\s+([a-z]+[\d]*(?:\(\d+(?:,\d+)?\))?)(.*)$/i
+        },
+        sqlserver: {
+            quote: /[\[\]]/,
+            comment: {},
+            identity: /IDENTITY\(\d+,\d+\)/i,
+            fieldPattern: /^\s*(\S+)\s+([a-z]+)(.*)$/i
+        },
+        dameng: {
+            quote: '"',
+            comment: {
+                table: /COMMENT\s+ON\s+TABLE\s+.+?\s+IS\s+'((?:\\'|[^'])*)'/i,
+                column: /COMMENT\s+ON\s+COLUMN\s+.+?\s+IS\s+'((?:\\'|[^'])*)'/i
+            },
+            identity: /IDENTITY\(\d+,\d+\)/i,
+            fieldPattern: /^\s*(\S+)\s+([a-z]+)(.*)$/i
+        }
+    }
+
+
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                inputMode: 'fields',
+                author: 'djz',
+                basePackage: 'com.example',
+                entityPackage: 'entity',
+                mapperPackage: 'mapper',
+                servicePackage: 'service',
+                controllerPackage: 'controller',
+                inputDbType: 'mysql',
+                inputText: '',
+                tableName: 'your_table',  // 默认表名
+                className: 'YourEntity',   // 默认类名
+                dbType: 'mysql',
+                sqlCode: '',
+                entityCode: '',
+                mapperCode: '',
+                mapperCodeXml: '',
+                serviceCodeInterface: '',
+                serviceCodeImpl: '',
+                controllerCode: '',
+                selectedTemplate: 'java',
+                templateNames: {
+                    java: 'Java 实体'
+                }
+            }
+        },
+        // 添加计算属性
+        computed: {
+            sqlInputPlaceholder() {
+                return this.inputMode === 'sql'
+                    ? "请输入CREATE TABLE语句，示例：\nCREATE TABLE user_info (\n  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '用户ID',\n  username VARCHAR(50) NOT NULL COMMENT '用户名'\n) COMMENT='用户信息表';"
+                    : "#表名: order_info 订单表\n" +
+                    "#类名: Order\n" +
+                    "订单ID:id bigint [主键]\n" +
+                    "订单金额:amount decimal(10,2)\n";
+            }
+        },
+        methods: {
+            // 解析输入文本
+            parseFields(text) {
+                let tableName = 'your_table';
+                let tableComment = '';
+                let className = 'YourEntity';
+
+                const fields = text.split('\n')
+                    .filter(line => line.trim())
+                    .map(line => {
+                        // 解析表名和表注释
+                        if (line.startsWith('#表名:')) {
+                            const parts = line.replace('#表名:', '').trim().split(/\s+/);
+                            tableName = parts[0];
+                            tableComment = parts.slice(1).join(' ') || '';
+                            return null;
+                        }
+                        // 解析类名
+                        if (line.startsWith('#类名:')) {
+                            className = line.replace('#类名:', '').trim();
+                            return null;
+                        }
+
+                        // 字段解析
+                        const pattern = /^\s*([^:]+):(\S+)(?:\s+(\S+))?(?:\s+\[([^\]]+)])?/;
+                        const match = line.match(pattern);
+                        if (!match) return null;
+
+                        return {
+                            cn: match[1].trim(),  // 中文注释
+                            en: match[2].trim(),
+                            type: (match[3] || 'varchar(255)').trim(),
+                            constraints: match[4] ? match[4].split(',').map(c => c.trim()) : []
+                        };
+                    })
+                    .filter(f => f !== null);
+
+                // 更新数据模型
+                this.tableName = tableName;
+                this.tableComment = tableComment;
+                this.className = className;
+                return fields;
+            },
+
+            autoGenerateEnName(cn) {
+                return cn
+                    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '')
+                    .replace(/([A-Z])/g, '_$1')
+                    .toLowerCase();
+            },
+
+            generateCode() {
+                const fields = this.parseInput(this.inputText);
+                if (!fields || !fields.length) return;
+
+                // 后续生成逻辑保持不变...
+                this.sqlCode = this.generateSQL(fields);
+
+                // 生成实体类
+                this.generateEntityCode(fields);
+                // 生成Mapper和Service
+                this.generateMapperCode();
+                this.generateMapperCodeXml(fields);
+                this.generateServiceCode();
+                this.generateControllerCode();
+            },
+
+            generateSQL(fields) {
+                const dbHandlers = {
+                    mysql: this.generateMySQL,
+                    oracle: this.generateOracle,
+                    sqlserver: this.generateSQLServer,
+                    dameng: this.generateDameng
+                };
+                return dbHandlers[this.dbType](fields);
+            },
+
+            generateMySQL(fields) {
+                let sql = `CREATE TABLE ${this.quoteIdentifier(this.getTableName())} (\n`;
+                sql += fields.map(f => {
+                    let line = `  ${this.quoteIdentifier(f.en)} ${this.mapDataType('mysql', f.type)}`;
+
+                    // 添加字段注释
+                    if (f.cn) {
+                        line += ` COMMENT '${this.escapeComment(f.cn)}'`;
+                    }
+
+                    // 处理约束条件
+                    if (f.constraints.includes('主键')) {
+                        line += ' PRIMARY KEY' + (f.constraints.includes('自增') ? ' AUTO_INCREMENT' : '');
+                    }
+                    if (f.constraints.includes('非空')) line += ' NOT NULL';
+                    if (f.constraints.includes('默认值')) line += ' DEFAULT CURRENT_TIMESTAMP';
+                    return line;
+                }).join(',\n');
+
+                // 添加表注释
+                const tableComment = this.getTableComment();
+                if (tableComment) {
+                    sql += `\n) COMMENT='${this.escapeComment(tableComment)}';`;
+                } else {
+                    sql += '\n);';
+                }
+                return sql;
+            },
+            // 新增注释转义方法
+            escapeComment(comment) {
+                return comment.replace(/'/g, "''"); // 处理单引号
+            },
+            // 修改Oracle生成方法
+            generateOracle(fields) {
+                let sql = `CREATE TABLE ${this.quoteIdentifier(this.getTableName())} (\n`;
+                sql += fields.map(f => {
+                    let line = `  ${this.quoteIdentifier(f.en)} ${this.mapDataType('oracle', f.type)}`;
+                    if (f.constraints.includes('非空')) line += ' NOT NULL';
+                    return line;
+                }).join(',\n');
+
+                // 主键处理...
+
+                sql += '\n);\n';
+
+                // 添加表和字段注释
+                const tableComment = this.getTableComment();
+                if (tableComment) {
+                    sql += `COMMENT ON TABLE ${this.getTableName()} IS '${this.escapeComment(tableComment)}';\n`;
+                }
+                fields.forEach(f => {
+                    if (f.cn) {
+                        sql += `COMMENT ON COLUMN ${this.getTableName()}.${f.en} IS '${this.escapeComment(f.cn)}';\n`;
+                    }
+                });
+
+                return sql;
+            },
+
+            generateSQLServer(fields) {
+                let sql = `CREATE TABLE ${this.quoteIdentifier(this.getTableName())} (\n`;
+                const tableComment = this.getTableComment();
+
+                // 生成字段定义
+                sql += fields.map(f => {
+                    let line = `  ${this.quoteIdentifier(f.en)} ${this.mapDataType('sqlserver', f.type)}`;
+
+                    // 字段约束
+                    if (f.constraints.includes('主键')) {
+                        line += ' PRIMARY KEY' + (f.constraints.includes('自增') ? ' IDENTITY(1,1)' : '');
+                    }
+                    if (f.constraints.includes('非空')) line += ' NOT NULL';
+                    if (f.constraints.includes('默认值')) line += ' DEFAULT GETDATE()';
+                    return line;
+                }).join(',\n');
+
+                sql += '\n);\n\n';
+
+                // 添加表注释
+                if (tableComment) {
+                    sql += `EXEC sp_addextendedproperty 'MS_Description', N'${this.escapeComment(tableComment)}', 'SCHEMA', 'dbo', 'TABLE', N'${this.getTableName()}';\n`;
+                }
+
+                // 添加字段注释
+                fields.forEach(f => {
+                    if (f.cn) {
+                        sql += `EXEC sp_addextendedproperty 'MS_Description', N'${this.escapeComment(f.cn)}', 'SCHEMA', 'dbo', 'TABLE', N'${this.getTableName()}', 'COLUMN', N'${f.en}';\n`;
+                    }
+                });
+
+                return sql;
+            },
+
+            generateDameng(fields) {
+                let sql = `CREATE TABLE ${this.quoteIdentifier(this.getTableName())} (\n`;
+                const tableComment = this.getTableComment();
+
+                // 生成字段定义
+                sql += fields.map(f => {
+                    let line = `  ${this.quoteIdentifier(f.en)} ${this.mapDataType('dameng', f.type)}`;
+
+                    // 字段约束
+                    if (f.constraints.includes('主键')) {
+                        line += ' PRIMARY KEY' + (f.constraints.includes('自增') ? ' IDENTITY(1,1)' : '');
+                    }
+                    if (f.constraints.includes('非空')) line += ' NOT NULL';
+                    if (f.constraints.includes('默认值')) line += ' DEFAULT SYSDATE';
+                    return line;
+                }).join(',\n');
+
+                sql += '\n);\n\n';
+
+                // 添加表注释
+                if (tableComment) {
+                    sql += `COMMENT ON TABLE ${this.getTableName()} IS '${this.escapeComment(tableComment)}';\n`;
+                }
+
+                // 添加字段注释
+                fields.forEach(f => {
+                    if (f.cn) {
+                        sql += `COMMENT ON COLUMN ${this.getTableName()}.${f.en} IS '${this.escapeComment(f.cn)}';\n`;
+                    }
+                });
+
+                return sql;
+            },
+
+            // 辅助方法
+            quoteIdentifier(name) {
+                const quotes = {
+                    mysql: '`',
+                    oracle: '"',
+                    sqlserver: '[',
+                    dameng: '"'
+                };
+                const endQuotes = {
+                    sqlserver: ']'
+                };
+                return `${quotes[this.dbType]}${name}${endQuotes[this.dbType] || quotes[this.dbType]}`;
+            },
+
+            mapDataType(db, type) {
+                const typeMaps = {
+                    mysql: {
+                        'int': 'INT',
+                        'varchar([0-9]+)': 'VARCHAR($1)',
+                        'datetime': 'DATETIME'
+                    },
+                    oracle: {
+                        'int': 'NUMBER(10)',
+                        'varchar([0-9]+)': 'VARCHAR2($1)',
+                        'datetime': 'DATE'
+                    },
+                    sqlserver: {
+                        'int': 'INT',
+                        'varchar([0-9]+)': 'VARCHAR($1)',
+                        'datetime': 'DATETIME'
+                    },
+                    dameng: {
+                        'int': 'INT',
+                        'varchar([0-9]+)': 'VARCHAR($1)',
+                        'datetime': 'DATETIME'
+                    }
+                };
+
+                const map = typeMaps[db];
+                for (const [pattern, replacement] of Object.entries(map)) {
+                    const regex = new RegExp(`^${pattern}$`);
+                    if (regex.test(type.toLowerCase())) {
+                        return type.replace(regex, replacement);
+                    }
+                }
+                return type.toUpperCase();
+            },
+
+// 类型映射改造
+            mapType(dbType) {
+                const typeMap = {
+                    'tinyint': 'Byte',
+                    'smallint': 'Short',
+                    'int': 'Integer',
+                    'bigint': 'Long',
+                    'varchar': 'String',
+                    'text': 'String',
+                    'datetime': 'LocalDateTime',
+                    'timestamp': 'LocalDateTime',
+                    'decimal': 'BigDecimal'
+                };
+                const baseType = dbType.replace(/\(.*\)/, '').toLowerCase();
+                return typeMap[baseType] || 'Object';
+            },
+            generateEntityCode(fields) {
+
+                if (!fields) {
+                    fields = this.parseFields(this.inputText);
+                }
+
+                if (!fields || !fields.length) return;
+
+                const config = window.ENTITY_TEMPLATES?._field_config || {};
+                const templateData = {
+                    ...this.getBaseTemplateData(),
+                    className: this.getClassName(),
+                    tableName: this.getTableName(),
+                    tableComment: this.getTableComment(),
+                    author: this.author,
+                    fields: fields.map(f => {
+                        const isPrimary = f.constraints.includes('主键');
+                        const timeFill = config.timeMapping
+                        && Object.prototype.hasOwnProperty.call(config.timeMapping, f.en)
+                            ? config.timeMapping[f.en].fill
+                            : '';
+
+                        return {
+
+                            dbField: f.en,
+                            fieldName: this.camelCase(f.en),
+                            fieldType: this.mapType(f.type),
+                            fieldComment: f.cn,
+                            isPrimary: isPrimary,
+                            isDescField: f.isDesc,
+                            isTimeField: f.isTime,
+                            timeFillType: timeFill
+                        };
+                    })
+                };
+console.log(templateData)
+                this.entityCode = TemplateEngine.render(
+                    window.ENTITY_TEMPLATES.mybatis_plus,
+                    templateData
+                )
+            },
+            generateMapperCode() {
+                const templateData = {
+                    ...this.getBaseTemplateData(),
+                    className: this.getClassName(),
+                    tableName: this.getTableName(),
+                    author: this.author,
+                    tableComment: this.getTableComment(),
+                };
+
+                this.mapperCode = TemplateEngine.render(
+                    window.ENTITY_TEMPLATES.mapper,
+                    templateData
+                );
+
+
+            },
+
+            generateServiceCode() {
+                const templateData = {
+                    ...this.getBaseTemplateData(),
+                    className: this.getClassName(),
+                    tableName: this.getTableName(),
+                    author: this.author,
+                    tableComment: this.getTableComment(),
+                };
+
+                this.serviceCodeInterface =
+                    TemplateEngine.render(window.ENTITY_TEMPLATES.service_interface, templateData)
+
+
+                this.serviceCodeImpl = TemplateEngine.render(window.ENTITY_TEMPLATES.service_impl, templateData);
+            },
+            // 其他工具方法
+            camelCase(str) {
+                return str.replace(/_(\w)/g, (_, c) => c.toUpperCase());
+            },
+            ucfirst(str) {
+                return str.charAt(0).toUpperCase() + str.slice(1);
+            },
+            getTableName() {
+                return this.tableName.replace(/[^\w]/g, '_');
+            },
+
+            getClassName() {
+                return this.ucfirst(this.className.replace(/[^\w]/g, ''));
+            },
+            // 修改获取表注释的方法
+            getTableComment() {
+                return this.tableComment || `${this.tableName} 表`;
+            },
+
+            // 复制功能
+            copyCode(content) {
+                const el = document.createElement('textarea');
+                el.value = content;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                this.$message.success('复制成功');
+            },
+            // 生成方法增强
+            generateMapperCodeXml(fields) {
+                if (!fields) {
+                    fields = this.parseFields(this.inputText);
+                }
+
+                const templateData = {
+                    ...this.getBaseTemplateData(),
+                    fields: fields.map(f => ({
+                        ...this.getBaseTemplateData(),
+                        ...f,
+                        dbField: f.en,
+                        fieldName: this.camelCase(f.en),
+                        fieldType: this.mapType(f.type),
+                        jdbcType: this.mapJdbcType(f.type),
+                        isLast: fields.indexOf(f) === fields.length - 1
+                    }))
+                };
+                this.mapperCodeXml = TemplateEngine.render(
+                    window.ENTITY_TEMPLATES.mapper_xml,
+                    templateData
+                );
+            },
+
+            generateControllerCode() {
+                const fields = this.parseFields(this.inputText);
+                const pkField = fields.find(f => f.constraints.includes('主键'));
+                const templateData = {
+                    ...this.getBaseTemplateData(),
+                    restPath: this.lowerFirst(this.getClassName()),
+                    serviceInstanceName: this.lowerFirst(this.getClassName()) + 'Service',
+                    idType: pkField ? this.mapType(pkField.type) : 'Long',
+                    tableComment: this.getTableComment(),
+                    author: this.author,
+                };
+
+                this.controllerCode = TemplateEngine.render(
+                    window.ENTITY_TEMPLATES.controller,
+                    templateData
+                );
+            },
+
+            // 辅助方法
+            getBaseTemplateData() {
+                return {
+                    basePackage: this.basePackage,
+                    entityPackage: this.entityPackage || 'entity',
+                    mapperPackage: this.mapperPackage || 'mapper',
+                    servicePackage: this.servicePackage || 'service',
+                    controllerPackage: this.controllerPackage || 'controller',
+                    className: this.getClassName(),
+                    tableName: this.getTableName()
+                };
+            },
+
+            mapJdbcType(dbType) {
+                const typeMap = {
+                    // ================ 数值类型 ================
+                    'int': 'INTEGER',
+                    'integer': 'INTEGER',
+                    'tinyint': 'TINYINT',        // MySQL
+                    'smallint': 'SMALLINT',
+                    'bigint': 'BIGINT',
+                    'float': 'FLOAT',
+                    'double': 'DOUBLE',
+                    'real': 'REAL',              // PostgreSQL
+                    'decimal': 'DECIMAL',
+                    'numeric': 'NUMERIC',        // Oracle/SQL Server
+                    'number': 'NUMERIC',         // Oracle
+                    'serial': 'INTEGER',         // PostgreSQL 自增
+                    'money': 'DECIMAL',          // SQL Server
+
+                    // ================ 字符串类型 ================
+                    'char': 'CHAR',
+                    'varchar': 'VARCHAR',
+                    'nvarchar': 'NVARCHAR',      // SQL Server
+                    'text': 'VARCHAR',
+                    'tinytext': 'VARCHAR',       // MySQL
+                    'mediumtext': 'VARCHAR',     // MySQL
+                    'longtext': 'VARCHAR',       // MySQL
+                    'clob': 'CLOB',              // Oracle/PostgreSQL
+                    'nclob': 'NCLOB',            // Oracle
+                    'enum': 'VARCHAR',           // MySQL 枚举类型
+                    'set': 'VARCHAR',            // MySQL 集合类型
+
+                    // ================ 日期时间类型 ================
+                    'date': 'DATE',
+                    'time': 'TIME',
+                    'year': 'INTEGER',           // MySQL YEAR(4)
+                    'datetime': 'TIMESTAMP',
+                    'timestamp': 'TIMESTAMP',
+                    'timestamptz': 'TIMESTAMP',  // PostgreSQL with timezone
+
+                    // ================ 二进制类型 ================
+                    'bit': 'BIT',
+                    'binary': 'BINARY',
+                    'varbinary': 'VARBINARY',
+                    'blob': 'BLOB',
+                    'tinyblob': 'BLOB',          // MySQL
+                    'mediumblob': 'BLOB',        // MySQL
+                    'longblob': 'BLOB',          // MySQL
+                    'raw': 'BLOB',               // Oracle
+                    'bytea': 'BLOB',             // PostgreSQL
+
+                    // ================ 其他类型 ================
+                    'boolean': 'BOOLEAN',
+                    'bool': 'BOOLEAN',           // PostgreSQL
+                    'json': 'VARCHAR',           // 或使用特定驱动的 JSON 类型
+                    'jsonb': 'VARCHAR',          // PostgreSQL
+                    'xml': 'CLOB',               // SQL Server/Oracle
+                    'uuid': 'VARCHAR',           // PostgreSQL UUID
+                    'inet': 'VARCHAR',           // PostgreSQL IP 地址
+                    'geometry': 'VARCHAR',       // MySQL 空间类型
+                    'cursor': 'OTHER'            // Oracle 游标类型
+                };
+
+                // 处理类型修饰符（如 varchar(255) -> varchar）
+                const baseType = dbType.replace(/$.*$/, '').toLowerCase().trim();
+
+                // 特殊处理 Oracle 的 NUMBER 类型
+                if (baseType === 'number') {
+                    const precision = dbType.match(/$(\d+)(,\d+)?$/);
+                    if (precision && precision) {
+                        return 'DECIMAL'; // 有小数部分 -> DECIMAL
+                    } else {
+                        return 'NUMERIC'; // 无小数部分 -> NUMERIC
+                    }
+                }
+
+                return typeMap[baseType] || 'VARCHAR'; // 默认返回 VARCHAR
+            },
+
+            lowerFirst(str) {
+                return str.charAt(0).toLowerCase() + str.slice(1);
+            },
+            async exportAllCode() {
+                try {
+                    const zip = new JSZip();
+
+                    // 获取基础信息
+                    const {
+                        basePackage,
+                        entityPackage = 'entity',
+                        mapperPackage = 'mapper',
+                        servicePackage = 'service',
+                        controllerPackage = 'controller'
+                    } = this;
+
+
+                    // 生成当前数据库类型的SQL
+                    const currentSQL = this.generateSQL(this.parseFields(this.inputText));
+                    const tableName = this.getTableName();
+                    zip.file(
+                        `db/${this.dbType}_${tableName}.sql`,
+                        currentSQL
+                    );
+
+
+                    const className = this.getClassName();
+                    const basePath = basePackage ? basePackage.split('.').join('/') + '/' : '';
+
+                    // 添加实体类
+                    if (this.entityCode) {
+                        zip.file(
+                            `${basePath}${entityPackage}/${className}.java`,
+                            this.entityCode
+                        );
+                    }
+
+                    // 添加Mapper
+                    if (this.mapperCode) {
+                        zip.file(
+                            `${basePath}${mapperPackage}/${className}Mapper.java`,
+                            this.mapperCode
+                        );
+
+                        zip.file(
+                            `${basePath}${mapperPackage}/xml/${className}Mapper.xml`,
+                            this.mapperCodeXml
+                        );
+                    }
+
+                    // 添加Service
+                    if (this.serviceCodeInterface) {
+
+                        zip.file(
+                            `${basePath}${servicePackage}/${className}Service.java`,
+                            this.serviceCodeInterface
+                        );
+                        zip.file(
+                            `${basePath}${servicePackage}/impl/${className}ServiceImpl.java`,
+                            this.serviceCodeImpl
+                        );
+                    }
+
+                    // 添加Controller
+                    if (this.controllerCode) {
+                        zip.file(
+                            `${basePath}${controllerPackage}/${className}Controller.java`,
+                            this.controllerCode
+                        );
+                    }
+
+                    // 生成ZIP文件
+                    const content = await zip.generateAsync({type: "blob"});
+                    const url = URL.createObjectURL(content);
+
+                    // 创建下载链接
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${this.getTableName()}_code.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // 清理资源
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    this.$message.success('导出成功');
+                } catch (e) {
+                    console.error('导出失败:', e);
+                    this.$message.error('导出失败，请检查控制台');
+                }
+            },
+            // 新增SQL解析方法
+// 核心解析方法
+            parseSQL(sqlText) {
+                let config = DB_CONFIG[this.inputDbType]
+                const cleanedSQL = this.cleanSQL(sqlText, config);
+
+                return {
+                    table: this.parseTable(cleanedSQL, config),
+                    fields: this.parseFieldSql(cleanedSQL, config),
+                };
+            },
+
+// SQL预处理
+            cleanSQL(sql, config) {
+                // 移除注释
+                let cleaned = sql
+                    .replace(/--.*$/gm, '')
+                    .replace(/\/\*[\s\S]*?\*\//g, '')
+                    .replace(/\n/g, ' ');
+
+                // 移除引号
+                const quoteRegex = new RegExp(config.quote, 'g');
+                return cleaned.replace(quoteRegex, '');
+            },
+
+// 解析表信息
+            parseTable(sql, config) {
+                const tableMatch = sql.match(/CREATE\s+TABLE\s+(\S+)/i);
+                return {
+                    name: tableMatch ? tableMatch[1] : 'unknown_table',
+                    comment: this.parseTableComment(sql, config)
+                };
+            },
+
+// 解析表注释
+            parseTableComment(sql, config) {
+                if (!config.comment.table) return '';
+                const match = sql.match(config.comment.table);
+                return match ? match[1].replace(/''/g, "'") : '';
+            },
+
+// 解析字段信息
+            parseFieldSql(sql, config) {
+
+                const fieldSection = sql.match(/\(([\s\S]+)\)/)?.[1] || '';
+                return fieldSection.split(',')
+                    .map(line => line.trim())
+                    .filter(line => line && !line.startsWith('PRIMARY KEY'))
+                    .map(line => this.parseField(line, config))
+                    .filter(Boolean);
+            },
+
+// 解析单个字段
+            parseField(line, config) {
+                console.log(line, config)
+                if (!config) return null;
+                const match = line.match(config.fieldPattern);
+                if (!match) return null;
+
+                const [_, name, type, rest] = match;
+                const constraints = this.parseConstraints(rest, config);
+
+                return {
+                    en: name.trim(),
+                    type: this.normalizeType(type, this.inputDbType),
+                    cn: constraints.comment,
+                    constraints: [
+                        ...(constraints.isPrimary ? ['主键'] : []),
+                        ...(constraints.isIdentity ? ['自增'] : []),
+                        ...(constraints.notNull ? ['非空'] : []),
+                        ...(constraints.defaultValue ? ['默认值'] : [])
+                    ]
+                };
+            },
+
+// 解析约束条件
+            parseConstraints(text, config) {
+                return {
+                    isPrimary: /PRIMARY\s+KEY/i.test(text),
+                    isIdentity: config.identity.test(text),
+                    notNull: /NOT\s+NULL/i.test(text),
+                    defaultValue: this.parseDefaultValue(text),
+                    comment: this.parseColumnComment(text, config)
+                };
+            },
+
+// 解析默认值
+            parseDefaultValue(text) {
+                const match = text.match(/DEFAULT\s+([^\s]+)/i);
+                return match ? match[1] : null;
+            },
+
+// 解析列注释
+            parseColumnComment(text, config) {
+                if (!config.comment.column) return '';
+                const match = text.match(config.comment.column);
+                return match ? match[1].replace(/''/g, "'") : '';
+            },
+
+// 类型标准化
+            normalizeType(rawType, dbType) {
+                const typeMap = {
+                    mysql: {
+                        'int|tinyint|smallint|mediumint|bigint': 'int',
+                        'varchar|char|text': 'varchar',
+                        'datetime|timestamp': 'datetime',
+                        'decimal|numeric': 'number'
+                    },
+                    oracle: {
+                        'number|integer': 'number',
+                        'varchar2|nvarchar2|char|clob': 'varchar',
+                        'date|timestamp': 'datetime'
+                    },
+                    sqlserver: {
+                        'int|bigint|smallint|tinyint': 'int',
+                        'varchar|nvarchar|text': 'varchar',
+                        'datetime|datetime2|smalldatetime': 'datetime',
+                        'decimal|numeric': 'number'
+                    },
+                    dameng: {
+                        'int|bigint': 'int',
+                        'varchar|char|text': 'varchar',
+                        'datetime|timestamp': 'datetime',
+                        'decimal|numeric': 'number'
+                    }
+                };
+
+                const baseType = rawType.replace(/\(\d+\)/, '').toLowerCase();
+                for (const [pattern, type] of Object.entries(typeMap[dbType])) {
+                    if (new RegExp(pattern).test(baseType)) return type;
+                }
+                return 'varchar';
+            },
+
+// 修改后的解析入口
+            parseInput(text) {
+                if (this.inputMode === 'sql') {
+                    try {
+                        const {table, fields} = this.parseSQL(text);
+                        this.tableName = table.name;
+                        this.className = this.generateClassName(table.name);
+                        this.tableComment = table.comment;
+                        return fields;
+                    } catch (e) {
+                        this.$message.error('SQL解析错误: ' + e.message);
+                        return [];
+                    }
+                } else {
+                    return this.parseFields(text);
+                }
+            },
+
+// 生成类名
+            generateClassName(tableName) {
+                return tableName
+                    .split(/[_\W]/)
+                    .filter(Boolean)
+                    .map(word => word[0].toUpperCase() + word.slice(1).toLowerCase())
+                    .join('');
+            },// 切换输入模式时清空数据
+            handleInputModeChange() {
+                this.inputText = '';
+                this.sqlCode = '';
+                this.entityCode = '';
+                // 清空其他生成的代码...
+            }
+        }
+    });
+</script>
+
+<style>
+    pre {
+        background: #f5f7fa;
+        padding: 16px;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+
+    .el-button {
+        margin-top: 10px;
+    }
+
+    code {
+        font-family: Monaco, Consolas, Courier, monospace;
+    }
+
+    pre code {
+        display: block;
+        white-space: pre; /* 禁止换行 */
+        overflow-x: auto; /* 横向滚动条自动显示‌:ml-citation{ref="2,4" data="citationList"} */
+        padding: 1em; /* 避免内容紧贴边缘 */
+    }
+
+</style>
+</body>
+</html>
